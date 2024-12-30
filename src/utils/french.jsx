@@ -25,9 +25,31 @@ export const normalizeText = (text) => {
     .replace(/[\u0300-\u036f]/g, '');
 };
 
+export const getBaseForm = (word) => {
+  const normalized = word.toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  
+  // Common verb endings
+  const endings = ['er', 'ir', 're'];
+  const commonEndings = ['e', 'es', 'ent', 'é', 'ée', 'és', 'ées', 'ant'];
+  
+  for (const ending of endings) {
+    if (normalized.endsWith(ending)) return word;
+    for (const commonEnding of commonEndings) {
+      if (normalized.endsWith(commonEnding)) {
+        const stem = normalized.slice(0, -commonEnding.length);
+        return stem + 'er';  // Most common case, could be expanded for -ir/-re verbs
+      }
+    }
+  }
+  return word;
+};
+
 export const getWordVariations = (word) => {
   const normalized = normalizeText(word);
-  const variations = new Set([normalized]);
+  const base = getBaseForm(word);
+  const variations = new Set([normalized, base]);
   
   if (normalized.endsWith('er')) {
     const stem = normalized.slice(0, -2);
@@ -38,6 +60,7 @@ export const getWordVariations = (word) => {
     variations.add(stem + 'ée');
     variations.add(stem + 'és');
     variations.add(stem + 'ées');
+    variations.add(stem + 'ant');
   }
 
   return Array.from(variations);
