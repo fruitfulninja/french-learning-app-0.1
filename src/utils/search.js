@@ -25,6 +25,11 @@ export const performSearch = (data, searchTerm, typeFilter, levelFilter, fuseOpt
   const relatedWords = findRelatedWords(searchTerm).filter(word => word !== searchTerm);
   console.log('relatedWords:', relatedWords);
 
+  // Prevent infinite recursion by limiting related words depth
+  if (relatedWords.length > 50) {
+    relatedWords.length = 50;
+  }
+
   // Perform search and map results
   let result = fuse.search(normalizeText(searchTerm))
     .map(({ item }) => item)
