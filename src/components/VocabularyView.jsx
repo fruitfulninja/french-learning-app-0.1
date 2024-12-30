@@ -1,12 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import useVocabularyStore from '../store/vocabularyStore';
 
+const ITEMS_PER_PAGE = 20;
+
 const VocabularyView = ({ onSearchWord }) => {
   const vocabularyStore = useVocabularyStore();
   const [filter, setFilter] = useState('');
   const [sortBy, setSortBy] = useState('word');
   const [sortOrder, setSortOrder] = useState('asc');
-
+  const [currentPage, setCurrentPage] = useState(1);
+  
   const vocabulary = vocabularyStore.getVocabulary() || {};
 
   const sortedWords = useMemo(() => {
@@ -34,6 +37,12 @@ const VocabularyView = ({ onSearchWord }) => {
     });
   }, [vocabulary, filter, sortBy, sortOrder]);
 
+  const totalPages = Math.ceil(sortedWords.length / ITEMS_PER_PAGE);
+  const paginatedWords = sortedWords.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   const handleSort = (key) => {
     if (sortBy === key) {
       setSortOrder(order => order === 'asc' ? 'desc' : 'asc');
@@ -41,6 +50,7 @@ const VocabularyView = ({ onSearchWord }) => {
       setSortBy(key);
       setSortOrder('asc');
     }
+    setCurrentPage(1); // Reset to first page when sorting changes
   };
 
   return (
@@ -49,7 +59,10 @@ const VocabularyView = ({ onSearchWord }) => {
         <input
           type="text"
           value={filter}
-          onChange={(e) => setFilter(e.target.value)}
+          onChange={(e) => {
+            setFilter(e.target.value);
+            setCurrentPage(1); // Reset to first page when filter changes
+          }}
           placeholder="Filter words..."
           className="px-4 py-2 border rounded-lg w-64"
         />
@@ -89,7 +102,7 @@ const VocabularyView = ({ onSearchWord }) => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {sortedWords.map(([word, data]) => (
+            {paginatedWords.map(([word, data]) => (
               <tr key={word} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">{word}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -125,6 +138,81 @@ const VocabularyView = ({ onSearchWord }) => {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex justify-between items-center mt-4">
+          <div className="text-sm text-gray-700">
+            Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, sortedWords.length)} of {sortedWords.length} entries
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className={`px-3 py-1 rounded ${
+                currentPage === 1
+                  ? 'bg-gray-100 text-gray-400'
+                  : 'bg-blue-500 text-white hover:bg-blue-600'
+              }`}
+            >
+              Previous
+            </button>
+            {totalPages <= 5 ? (
+              [...Array(totalPages)].map((_, i) => (
+                <button
+                  key={i + 1}
+                  onClick={() => setCurrentPage(i + 1)}
+                  className={`px-3 py-1 rounded ${
+                    currentPage === i + 1
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-100 hover:bg-gray-200'
+                  }`}
+                >
+                  {i + 1}
+                </button>
+              ))
+            ) : (
+              <>
+                {[...Array(3)].map((_, i) => (
+                  <button
+                    key={i + 1}
+                    onClick={() => setCurrentPage(i + 1)}
+                    className={`px-3 py-1 rounded ${
+                      currentPage === i + 1
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-100 hover:bg-gray-200'
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+                <span className="px-2">...</span>
+                <button
+                  onClick={() => setCurrentPage(totalPages)}
+                  className={`px-3 py-1 rounded ${
+                    currentPage === totalPages
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-100 hover:bg-gray-200'
+                  }`}
+                >
+                  {totalPages}
+                </button>
+              </>
+            )}
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className={`px-3 py-1 rounded ${
+                currentPage === totalPages
+                  ? 'bg-gray-100 text-gray-400'
+                  : 'bg-blue-500 text-white hover:bg-blue-600'
+              }`}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
