@@ -1,15 +1,26 @@
 // store/vocabularyStore.js
-const getInitialVocabulary = () => {
-  try {
-    const saved = localStorage.getItem('french-vocabulary');
-    return saved ? JSON.parse(saved) : {};
-  } catch {
-    return {};
-  }
-};
 
-const vocabularyStore = {
-  vocabulary: getInitialVocabulary(),
+class VocabularyStore {
+  constructor() {
+    this._vocabulary = this._loadFromStorage();
+  }
+
+  _loadFromStorage() {
+    try {
+      const saved = localStorage.getItem('french-vocabulary');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  _saveToStorage() {
+    try {
+      localStorage.setItem('french-vocabulary', JSON.stringify(this._vocabulary));
+    } catch (e) {
+      console.error('Failed to save vocabulary:', e);
+    }
+  }
 
   indexWords(text) {
     if (!text) return;
@@ -17,44 +28,40 @@ const vocabularyStore = {
       .filter(word => word.length > 1);
     
     words.forEach(word => {
-      if (!this.vocabulary[word]) {
-        this.vocabulary[word] = {
+      if (!this._vocabulary[word]) {
+        this._vocabulary[word] = {
           stars: 0,
           lastUpdated: new Date(),
           occurrences: 1
         };
       } else {
-        this.vocabulary[word].occurrences++;
+        this._vocabulary[word].occurrences++;
       }
     });
-    this.save();
-  },
+    this._saveToStorage();
+  }
 
   setStars(word, stars) {
-    if (!this.vocabulary[word]) {
-      this.vocabulary[word] = {
+    if (!this._vocabulary[word]) {
+      this._vocabulary[word] = {
         stars: 0,
         lastUpdated: new Date(),
         occurrences: 0
       };
     }
-    this.vocabulary[word].stars = stars;
-    this.vocabulary[word].lastUpdated = new Date();
-    this.save();
-  },
+    this._vocabulary[word].stars = stars;
+    this._vocabulary[word].lastUpdated = new Date();
+    this._saveToStorage();
+  }
 
-  save() {
-    try {
-      localStorage.setItem('french-vocabulary', JSON.stringify(this.vocabulary));
-    } catch (e) {
-      console.error('Failed to save vocabulary:', e);
-    }
-  },
+  get vocabulary() {
+    return this._vocabulary;
+  }
 
   exportVocabulary() {
     const csv = [
       ['Word', 'Stars', 'Occurrences', 'Last Updated'].join(','),
-      ...Object.entries(this.vocabulary).map(([word, data]) => [
+      ...Object.entries(this._vocabulary).map(([word, data]) => [
         word,
         data.stars,
         data.occurrences,
@@ -63,8 +70,9 @@ const vocabularyStore = {
     ].join('\n');
     return csv;
   }
-};
+}
 
-const useVocabularyStore = () => vocabularyStore;
+const store = new VocabularyStore();
+const useVocabularyStore = () => store;
 
 export default useVocabularyStore;
