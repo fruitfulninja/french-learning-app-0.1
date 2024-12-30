@@ -1,26 +1,14 @@
 // store/vocabularyStore.js
+let vocabulary = JSON.parse(localStorage.getItem('french-vocabulary') || '{}');
 
-class VocabularyStore {
-  constructor() {
-    this._vocabulary = this._loadFromStorage();
-  }
+const saveVocabulary = () => {
+  localStorage.setItem('french-vocabulary', JSON.stringify(vocabulary));
+};
 
-  _loadFromStorage() {
-    try {
-      const saved = localStorage.getItem('french-vocabulary');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  }
-
-  _saveToStorage() {
-    try {
-      localStorage.setItem('french-vocabulary', JSON.stringify(this._vocabulary));
-    } catch (e) {
-      console.error('Failed to save vocabulary:', e);
-    }
-  }
+const vocabularyStore = {
+  getVocabulary() {
+    return vocabulary;
+  },
 
   indexWords(text) {
     if (!text) return;
@@ -28,40 +16,33 @@ class VocabularyStore {
       .filter(word => word.length > 1);
     
     words.forEach(word => {
-      if (!this._vocabulary[word]) {
-        this._vocabulary[word] = {
+      if (!vocabulary[word]) {
+        vocabulary[word] = {
           stars: 0,
           lastUpdated: new Date(),
           occurrences: 1
         };
       } else {
-        this._vocabulary[word].occurrences++;
+        vocabulary[word].occurrences++;
       }
     });
-    this._saveToStorage();
-  }
+    saveVocabulary();
+  },
 
   setStars(word, stars) {
-    if (!this._vocabulary[word]) {
-      this._vocabulary[word] = {
-        stars: 0,
-        lastUpdated: new Date(),
-        occurrences: 0
-      };
-    }
-    this._vocabulary[word].stars = stars;
-    this._vocabulary[word].lastUpdated = new Date();
-    this._saveToStorage();
-  }
-
-  get vocabulary() {
-    return this._vocabulary;
-  }
+    vocabulary[word] = {
+      ...(vocabulary[word] || {}),
+      stars,
+      lastUpdated: new Date(),
+      occurrences: (vocabulary[word]?.occurrences || 0)
+    };
+    saveVocabulary();
+  },
 
   exportVocabulary() {
     const csv = [
       ['Word', 'Stars', 'Occurrences', 'Last Updated'].join(','),
-      ...Object.entries(this._vocabulary).map(([word, data]) => [
+      ...Object.entries(vocabulary).map(([word, data]) => [
         word,
         data.stars,
         data.occurrences,
@@ -70,9 +51,6 @@ class VocabularyStore {
     ].join('\n');
     return csv;
   }
-}
+};
 
-const store = new VocabularyStore();
-const useVocabularyStore = () => store;
-
-export default useVocabularyStore;
+export default () => vocabularyStore;
