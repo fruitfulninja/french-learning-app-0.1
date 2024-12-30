@@ -32,9 +32,12 @@ const App = () => {
 
   // Fuse.js options
   const fuseOptions = {
-    keys: ['content', 'choices'],
-    threshold: 0.3,
+    keys: ['content', 'choices', 'normalizedContent'],
+    threshold: 0.2, // Lower threshold for more matches
+    distance: 100, // Increase distance for better partial matches
+    minMatchCharLength: 3, // Minimum length of matched substring
     includeScore: true,
+    ignoreLocation: true, // Ignore where in the string the match occurs
   };
 
   // Search debouncing
