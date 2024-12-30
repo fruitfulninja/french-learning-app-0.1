@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
+import Fuse from 'fuse.js';
 import SearchView from './components/SearchView';
-import { fixEncoding, normalizeText, getWordVariations, getBaseForm,highlightText } from './utils/french.jsx';
+import { fixEncoding, normalizeText } from './utils/french.jsx';
+import { performSearch } from './utils/search.ts';
 
 // Tab configuration - makes it easy to add new features
 const TABS = {
@@ -28,6 +30,13 @@ const App = () => {
   // Navigation state
   const [activeTab, setActiveTab] = useState('search');
 
+  // Fuse.js options
+  const fuseOptions = {
+    keys: ['content', 'choices'],
+    threshold: 0.3,
+    includeScore: true,
+  };
+
   // Search debouncing
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -41,50 +50,9 @@ const App = () => {
     loadData();
   }, []);
 
-  // This should replace your current filtering useEffect in App.jsx
+  // Update filtering logic to use the new search function
   useEffect(() => {
-    let filtered = [...data];
-
-    if (debouncedSearch) {
-      const searchTerms = debouncedSearch.toLowerCase().split(/\s+/).filter(Boolean);
-      
-      filtered = filtered.filter(item => {
-        // Get all words from content and choices
-        const contentWords = (item.content + ' ' + (item.choices || ''))
-          .toLowerCase()
-          .replace(/[.,!?()]/g, ' ')
-          .split(/\s+/)
-          .filter(word => word.length >= 2)
-          .flatMap(word => {
-            // For each word, create variations including the base form
-            const base = getBaseForm(word);
-            return [word, base];
-          });
-
-        // Item matches if for each search term, we find either:
-        // - The term itself
-        // - A variation of the term
-        // - The base form of the term
-        // - Or the term is a conjugated form of a word in content
-        return searchTerms.every(term => {
-          const searchBase = getBaseForm(term);
-          return contentWords.some(word => 
-            word === term || 
-            word === searchBase || 
-            getBaseForm(word) === searchBase
-          );
-        });
-      });
-    }
-
-    if (typeFilter) {
-      filtered = filtered.filter(item => item.type === typeFilter);
-    }
-
-    if (levelFilter) {
-      filtered = filtered.filter(item => item.level === levelFilter);
-    }
-
+    let filtered = performSearch(data, debouncedSearch, typeFilter, levelFilter, fuseOptions);
     setFilteredData(filtered);
   }, [debouncedSearch, typeFilter, levelFilter, data]);
 
