@@ -48,7 +48,7 @@ const App = () => {
   // Initial data load
   useEffect(() => {
     loadData();
-  }, []);
+  }, []); // Add empty dependency array to ensure it runs only once
 
   // Update filtering logic to use the new search function
   useEffect(() => {
