@@ -5,6 +5,40 @@ import { normalizeText, getWordInfo, findRelatedWords } from './french.js';
 // Add memoization cache
 const relatedWordsCache = new Map();
 
+// Add recursion depth tracking
+const MAX_RECURSION_DEPTH = 3;
+
+const getRelatedWordsWithDepth = (word, depth = 0) => {
+  if (depth >= MAX_RECURSION_DEPTH) return new Set();
+  
+  const cacheKey = `${word}-${depth}`;
+  if (relatedWordsCache.has(cacheKey)) {
+    return relatedWordsCache.get(cacheKey);
+  }
+
+  try {
+    const directRelated = new Set(findRelatedWords(word));
+    const allRelated = new Set(directRelated);
+    
+    if (depth < MAX_RECURSION_DEPTH - 1) {
+      for (const related of directRelated) {
+        if (related !== word) {
+          const subRelated = getRelatedWordsWithDepth(related, depth + 1);
+          for (const subWord of subRelated) {
+            allRelated.add(subWord);
+          }
+        }
+      }
+    }
+    
+    relatedWordsCache.set(cacheKey, allRelated);
+    return allRelated;
+  } catch (error) {
+    console.error('Error finding related words:', error);
+    return new Set();
+  }
+};
+
 export const performSearch = (data, searchTerm, typeFilter, levelFilter, fuseOptions) => {
   console.log('performSearch called with:', { searchTerm, typeFilter, levelFilter });
   
@@ -31,16 +65,11 @@ export const performSearch = (data, searchTerm, typeFilter, levelFilter, fuseOpt
 
   // Get word variations and related words with memoization
   const wordInfo = getWordInfo(searchTerm);
-  let relatedWords;
-  
-  if (relatedWordsCache.has(searchTerm)) {
-    relatedWords = relatedWordsCache.get(searchTerm);
-  } else {
-    relatedWords = findRelatedWords(searchTerm)
-      .filter(word => word !== searchTerm)
-      .slice(0, 50); // Limit related words to prevent stack overflow
-    relatedWordsCache.set(searchTerm, relatedWords);
-  }
+
+  // Use the new depth-aware related words function
+  const relatedWords = Array.from(getRelatedWordsWithDepth(searchTerm))
+    .filter(word => word !== searchTerm)
+    .slice(0, 50);
 
   console.log('relatedWords:', relatedWords);
 
@@ -67,7 +96,7 @@ export const performSearch = (data, searchTerm, typeFilter, levelFilter, fuseOpt
 };
 
 // Clear cache periodically to prevent memory leaks
-setInterval(() => relatedWordsCache.clear(), 30 * 60 * 1000); // Clear every 30 minutes
+setInterval(() => relatedWordsCache.clear(), 60 * 60 * 1000); // Clear every hour
 
 const filterByTypeAndLevel = (data, typeFilter, levelFilter) => {
   let filtered = data;
