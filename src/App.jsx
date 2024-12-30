@@ -41,22 +41,39 @@ const App = () => {
     loadData();
   }, []);
 
-  // Replace your current filtering useEffect with this:
+  // This should replace your current filtering useEffect in App.jsx
   useEffect(() => {
-    let filtered = [...data];  // Make a copy of the data array
+    let filtered = [...data];
 
     if (debouncedSearch) {
       const searchTerms = debouncedSearch.toLowerCase().split(/\s+/).filter(Boolean);
-      const searchVariations = searchTerms.flatMap(getWordVariations);
-
+      
       filtered = filtered.filter(item => {
-        const content = normalizeText(item.content + ' ' + (item.choices || ''));
-        // Item matches if it contains at least one variation of each search term
-        return searchTerms.every(term => 
-          searchVariations
-            .filter(v => v.startsWith(normalizeText(term)))
-            .some(variation => content.includes(variation))
-        );
+        // Get all words from content and choices
+        const contentWords = (item.content + ' ' + (item.choices || ''))
+          .toLowerCase()
+          .replace(/[.,!?()]/g, ' ')
+          .split(/\s+/)
+          .filter(word => word.length >= 2)
+          .flatMap(word => {
+            // For each word, create variations including the base form
+            const base = getBaseForm(word);
+            return [word, base];
+          });
+
+        // Item matches if for each search term, we find either:
+        // - The term itself
+        // - A variation of the term
+        // - The base form of the term
+        // - Or the term is a conjugated form of a word in content
+        return searchTerms.every(term => {
+          const searchBase = getBaseForm(term);
+          return contentWords.some(word => 
+            word === term || 
+            word === searchBase || 
+            getBaseForm(word) === searchBase
+          );
+        });
       });
     }
 
