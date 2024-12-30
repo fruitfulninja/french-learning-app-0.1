@@ -13,6 +13,7 @@ const VocabularyView = ({ onSearchWord }) => {
   const vocabulary = vocabularyStore.getVocabulary() || {};
 
   const sortedWords = useMemo(() => {
+    console.log('Sorting words with filter:', filter);
     const words = Object.entries(vocabulary)
       .filter(([word]) => 
         word.toLowerCase().includes(filter.toLowerCase())

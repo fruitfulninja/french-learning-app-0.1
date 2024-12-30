@@ -14,6 +14,7 @@ const store = {
   },
 
   indexWords(text) {
+    console.log('indexWords called with:', text);
     if (!text) return;
     text.split(/[\s.,!?;:'"()[\]{}<>]+/)
       .filter(word => word.length > 1 && !data.vocabulary[word])

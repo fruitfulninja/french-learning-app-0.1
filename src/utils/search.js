@@ -3,6 +3,7 @@ import Fuse from 'fuse.js';
 import { normalizeText, getWordInfo, findRelatedWords } from './french.js';
 
 export const performSearch = (data, searchTerm, typeFilter, levelFilter, fuseOptions) => {
+  console.log('performSearch called with:', { searchTerm, typeFilter, levelFilter });
   // Return filtered data if no search term
   if (!searchTerm) {
     return filterByTypeAndLevel(data, typeFilter, levelFilter);
@@ -22,6 +23,7 @@ export const performSearch = (data, searchTerm, typeFilter, levelFilter, fuseOpt
   // Get word variations and related words
   const wordInfo = getWordInfo(searchTerm);
   const relatedWords = findRelatedWords(searchTerm).filter(word => word !== searchTerm);
+  console.log('relatedWords:', relatedWords);
 
   // Perform search and map results
   let result = fuse.search(normalizeText(searchTerm))
@@ -40,6 +42,7 @@ export const performSearch = (data, searchTerm, typeFilter, levelFilter, fuseOpt
       if (!aMatches && bMatches) return 1;
       return 0;
     });
+  console.log('search result:', result);
 
   return filterByTypeAndLevel(result, typeFilter, levelFilter);
 };
