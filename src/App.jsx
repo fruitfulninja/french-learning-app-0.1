@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import SearchView from './components/SearchView';
-import { fixEncoding, normalizeText, getWordVariations } from './utils/french';
+import { fixEncoding, normalizeText, getWordVariations } from './utils/french.jsx';
 
 // Tab configuration - makes it easy to add new features
 const TABS = {
