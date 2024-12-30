@@ -10,12 +10,6 @@ const TABS = {
     label: 'Search Questions',
     component: SearchView
   }
-  // New tabs will be added here, for example:
-  // vocabulary: {
-  //   id: 'vocabulary',
-  //   label: 'Vocabulary List',
-  //   component: VocabularyManager
-  // }
 };
 
 const App = () => {
@@ -49,7 +43,25 @@ const App = () => {
 
   // Filter data when search or filters change
   useEffect(() => {
-    filterData();
+    let filtered = [...data]; // Create a copy of data array
+
+    if (debouncedSearch) {
+      const searchTerms = debouncedSearch.toLowerCase().split(/\s+/).filter(Boolean);
+      const variations = searchTerms.flatMap(getWordVariations);
+      filtered = filtered.filter(item => 
+        variations.some(v => item.normalizedContent?.includes(v))
+      );
+    }
+
+    if (typeFilter) {
+      filtered = filtered.filter(item => item.type === typeFilter);
+    }
+
+    if (levelFilter) {
+      filtered = filtered.filter(item => item.level === levelFilter);
+    }
+
+    setFilteredData(filtered);
   }, [debouncedSearch, typeFilter, levelFilter, data]);
 
   const loadData = async () => {
@@ -119,28 +131,6 @@ const App = () => {
       setError('Failed to load data: ' + err.message);
       setLoading(false);
     }
-  };
-
-  const filterData = () => {
-    let filtered = data;
-
-    if (debouncedSearch) {
-      const searchTerms = debouncedSearch.toLowerCase().split(/\s+/).filter(Boolean);
-      const variations = searchTerms.flatMap(getWordVariations);
-      filtered = filtered.filter(item => 
-        variations.some(v => item.normalizedContent.includes(v))
-      );
-    }
-
-    if (typeFilter) {
-      filtered = filtered.filter(item => item.type === typeFilter);
-    }
-
-    if (levelFilter) {
-      filtered = filtered.filter(item => item.level === levelFilter);
-    }
-
-    setFilteredData(filtered);
   };
 
   if (loading) {
