@@ -1,3 +1,5 @@
+import React from 'react';
+
 export const fixEncoding = (text) => {
   if (!text) return '';
   return text
