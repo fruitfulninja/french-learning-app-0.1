@@ -42,15 +42,16 @@ const App = () => {
   }, []);
 
   // Filter data when search or filters change
+  // In your useEffect for filtering data, update this part:
   useEffect(() => {
-    let filtered = [...data]; // Create a copy of data array
+    let filtered = [...data];  // Make a copy of the data array
 
     if (debouncedSearch) {
       const searchTerms = debouncedSearch.toLowerCase().split(/\s+/).filter(Boolean);
-      const variations = searchTerms.flatMap(getWordVariations);
-      filtered = filtered.filter(item => 
-        variations.some(v => item.normalizedContent?.includes(v))
-      );
+      filtered = filtered.filter(item => {
+        const content = (item.content + ' ' + (item.choices || '')).toLowerCase();
+        return searchTerms.every(term => content.includes(term));
+      });
     }
 
     if (typeFilter) {
