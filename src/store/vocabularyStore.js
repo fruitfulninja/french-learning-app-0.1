@@ -1,84 +1,70 @@
 // store/vocabularyStore.js
-import { getBaseForm, getWordInfo } from '../utils/french';
-
-// Initialize store with data from localStorage
 const getInitialVocabulary = () => {
   try {
     const saved = localStorage.getItem('french-vocabulary');
     return saved ? JSON.parse(saved) : {};
-  } catch (e) {
-    console.error('Error loading vocabulary:', e);
+  } catch {
     return {};
   }
 };
 
-const saveVocabulary = (vocab) => {
-  try {
-    localStorage.setItem('french-vocabulary', JSON.stringify(vocab));
-  } catch (e) {
-    console.error('Error saving vocabulary:', e);
-  }
-};
-
-const vocabularyState = {
+const vocabularyStore = {
   vocabulary: getInitialVocabulary(),
 
   indexWords(text) {
     if (!text) return;
-    
     const words = text.split(/[\s.,!?;:'"()[\]{}<>]+/)
       .filter(word => word.length > 1);
     
-    const newVocab = { ...this.vocabulary };
-
     words.forEach(word => {
-      const baseForm = getBaseForm(word);
-      const info = getWordInfo(word);
-      if (!newVocab[baseForm]) {
-        newVocab[baseForm] = {
+      if (!this.vocabulary[word]) {
+        this.vocabulary[word] = {
           stars: 0,
           lastUpdated: new Date(),
-          type: info?.type || 'unknown',
-          variations: info?.conjugations || []
+          occurrences: 1
         };
+      } else {
+        this.vocabulary[word].occurrences++;
       }
     });
-
-    this.vocabulary = newVocab;
-    saveVocabulary(newVocab);
+    this.save();
   },
 
   setStars(word, stars) {
-    const baseForm = getBaseForm(word);
-    const newVocab = {
-      ...this.vocabulary,
-      [baseForm]: {
-        ...this.vocabulary[baseForm],
-        stars,
-        lastUpdated: new Date()
-      }
-    };
+    if (!this.vocabulary[word]) {
+      this.vocabulary[word] = {
+        stars: 0,
+        lastUpdated: new Date(),
+        occurrences: 0
+      };
+    }
+    this.vocabulary[word].stars = stars;
+    this.vocabulary[word].lastUpdated = new Date();
+    this.save();
+  },
 
-    this.vocabulary = newVocab;
-    saveVocabulary(newVocab);
+  save() {
+    try {
+      localStorage.setItem('french-vocabulary', JSON.stringify(this.vocabulary));
+    } catch (e) {
+      console.error('Failed to save vocabulary:', e);
+    }
   },
 
   exportVocabulary() {
     const csv = [
-      ['Word', 'Type', 'Stars', 'Last Updated', 'Variations'].join(','),
+      ['Word', 'Stars', 'Occurrences', 'Last Updated'].join(','),
       ...Object.entries(this.vocabulary).map(([word, data]) => [
         word,
-        data.type,
         data.stars,
-        new Date(data.lastUpdated).toISOString(),
-        data.variations?.join(';') || ''
+        data.occurrences,
+        new Date(data.lastUpdated).toISOString()
       ].join(','))
     ].join('\n');
-    
     return csv;
   }
 };
 
-const useVocabularyStore = () => vocabularyState;
+const useVocabularyStore = () => vocabularyStore;
 
 export default useVocabularyStore;
