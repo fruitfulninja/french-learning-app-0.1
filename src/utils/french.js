@@ -1,4 +1,4 @@
-import React from 'react';
+// utils/french.js
 
 export const fixEncoding = (text) => {
   if (!text) return '';
@@ -169,7 +169,6 @@ export const getWordInfo = (word) => {
   return null;
 };
 
-// Enhance getWordVariations to include vocabulary variations
 export const getWordVariations = (word) => {
   const normalized = normalizeText(word);
   const variations = new Set([normalized]);
@@ -190,49 +189,16 @@ export const getWordVariations = (word) => {
     }
   }
 
-  // Continue with existing irregular and regular verb handling
+  // Handle regular verb conjugations
   if (normalized.endsWith('er')) {
     const stem = normalized.slice(0, -2);
-    // Present tense
     variations.add(stem + 'e');
     variations.add(stem + 'es');
     variations.add(stem + 'ent');
-    // Past participle
     variations.add(stem + 'é');
     variations.add(stem + 'ée');
     variations.add(stem + 'és');
     variations.add(stem + 'ées');
-    // Present participle
-    variations.add(stem + 'ant');
-  } else if (normalized.endsWith('ir')) {
-    const stem = normalized.slice(0, -2);
-    // Present tense
-    variations.add(stem + 'is');
-    variations.add(stem + 'it');
-    variations.add(stem + 'issons');
-    variations.add(stem + 'issez');
-    variations.add(stem + 'issent');
-    // Past participle
-    variations.add(stem + 'i');
-    variations.add(stem + 'ie');
-    variations.add(stem + 'is');
-    variations.add(stem + 'ies');
-    // Present participle
-    variations.add(stem + 'issant');
-  } else if (normalized.endsWith('re')) {
-    const stem = normalized.slice(0, -2);
-    // Present tense
-    variations.add(stem + 's');
-    variations.add(stem);
-    variations.add(stem + 'ons');
-    variations.add(stem + 'ez');
-    variations.add(stem + 'ent');
-    // Past participle
-    variations.add(stem + 'u');
-    variations.add(stem + 'ue');
-    variations.add(stem + 'us');
-    variations.add(stem + 'ues');
-    // Present participle
     variations.add(stem + 'ant');
   }
 
@@ -252,10 +218,5 @@ export const highlightText = (text, searchTerm) => {
   
   const parts = text.split(new RegExp(`(${pattern})`, 'gi'));
   
-  return parts.map((part, i) => {
-    if (variations.includes(normalizeText(part))) {
-      return <mark key={i} className="bg-yellow-200 px-0.5 rounded">{part}</mark>;
-    }
-    return part;
-  });
+  return parts;
 };

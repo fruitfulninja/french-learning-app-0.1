@@ -1,6 +1,6 @@
+// components/SearchView.jsx
 import React from 'react';
 import StatsTable from './StatsTable';
-import { highlightText } from '../utils/french';
 import useVocabularyStore from '../store/vocabularyStore';
 import { getBaseForm } from '../utils/french';
 
@@ -15,12 +15,33 @@ const SearchView = ({
   setLevelFilter,
   filteredData 
 }) => {
-  const { vocabulary, setStars } = useVocabularyStore();
+  const vocabularyStore = useVocabularyStore();
 
   const handleStarWord = (word) => {
     const baseForm = getBaseForm(word);
-    const currentStars = vocabulary[baseForm]?.stars || 0;
-    setStars(baseForm, (currentStars % 5) + 1);
+    const currentStars = vocabularyStore.vocabulary[baseForm]?.stars || 0;
+    vocabularyStore.setStars(baseForm, (currentStars % 5) + 1);
+  };
+
+  const renderHighlightedText = (text, searchTerm) => {
+    if (!searchTerm || !text) return text;
+    
+    const parts = text.split(new RegExp(`(${searchTerm})`, 'gi'));
+    
+    return parts.map((part, i) => {
+      if (part.toLowerCase() === searchTerm.toLowerCase()) {
+        return (
+          <mark 
+            key={i} 
+            className="bg-yellow-200 px-0.5 rounded cursor-pointer hover:bg-yellow-300"
+            onClick={() => handleStarWord(part)}
+          >
+            {part}
+          </mark>
+        );
+      }
+      return part;
+    });
   };
 
   return (
@@ -93,19 +114,14 @@ const SearchView = ({
             <div className="mt-4 text-lg leading-relaxed">
               <div className="text-gray-800 whitespace-pre-wrap">
                 {debouncedSearch ? 
-                  highlightText(item.content, debouncedSearch).map((part, i) => 
-                    React.isValidElement(part) ? 
-                      React.cloneElement(part, {
-                        onClick: () => handleStarWord(part.props.children),
-                        className: part.props.className + ' cursor-pointer hover:text-blue-600'
-                      }) : 
-                      part
-                  ) : 
+                  renderHighlightedText(item.content, debouncedSearch) : 
                   item.content}
               </div>
               {item.choices && (
                 <div className="mt-4 text-gray-700 whitespace-pre-wrap border-t pt-4">
-                  {debouncedSearch ? highlightText(item.choices, debouncedSearch) : item.choices}
+                  {debouncedSearch ? 
+                    renderHighlightedText(item.choices, debouncedSearch) : 
+                    item.choices}
                 </div>
               )}
             </div>
