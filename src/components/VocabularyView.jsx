@@ -1,4 +1,3 @@
-// components/VocabularyView.jsx
 import React, { useState, useMemo } from 'react';
 import useVocabularyStore from '../store/vocabularyStore';
 
@@ -8,17 +7,10 @@ const VocabularyView = ({ onSearchWord }) => {
   const [sortBy, setSortBy] = useState('word');
   const [sortOrder, setSortOrder] = useState('asc');
 
-  const handleSort = (key) => {
-    if (sortBy === key) {
-      setSortOrder(order => order === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(key);
-      setSortOrder('asc');
-    }
-  };
+  const vocabulary = vocabularyStore.getVocabulary() || {};
 
   const sortedWords = useMemo(() => {
-    const words = Object.entries(vocabularyStore.vocabulary)
+    const words = Object.entries(vocabulary)
       .filter(([word]) => 
         word.toLowerCase().includes(filter.toLowerCase())
       );
@@ -33,14 +25,23 @@ const VocabularyView = ({ onSearchWord }) => {
           comparison = (dataA.stars || 0) - (dataB.stars || 0);
           break;
         case 'lastUpdated':
-          comparison = new Date(dataA.lastUpdated) - new Date(dataB.lastUpdated);
+          comparison = new Date(dataA.lastUpdated || 0) - new Date(dataB.lastUpdated || 0);
           break;
         default:
           comparison = 0;
       }
       return sortOrder === 'asc' ? comparison : -comparison;
     });
-  }, [vocabularyStore.vocabulary, filter, sortBy, sortOrder]);
+  }, [vocabulary, filter, sortBy, sortOrder]);
+
+  const handleSort = (key) => {
+    if (sortBy === key) {
+      setSortOrder(order => order === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(key);
+      setSortOrder('asc');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -53,18 +54,7 @@ const VocabularyView = ({ onSearchWord }) => {
           className="px-4 py-2 border rounded-lg w-64"
         />
         <button
-          onClick={() => {
-            const csv = vocabularyStore.exportVocabulary();
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'vocabulary.csv';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-          }}
+          onClick={vocabularyStore.exportVocabulary}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
         >
           Export CSV
@@ -120,7 +110,7 @@ const VocabularyView = ({ onSearchWord }) => {
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  {new Date(data.lastUpdated).toLocaleDateString()}
+                  {data.lastUpdated ? new Date(data.lastUpdated).toLocaleDateString() : '-'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <button
