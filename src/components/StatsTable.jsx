@@ -9,6 +9,7 @@ const StatsTable = ({ data, onCellClick, activeType, activeLevel }) => {
   const colTotals = {};
   let total = 0;
 
+  // Initialize the matrix and totals
   types.forEach(type => {
     matrix[type] = {};
     levels.forEach(level => {
@@ -18,10 +19,11 @@ const StatsTable = ({ data, onCellClick, activeType, activeLevel }) => {
   });
   levels.forEach(level => colTotals[level] = 0);
 
+  // Fill the matrix
   data.forEach(item => {
     if (matrix[item.type] && matrix[item.type][item.level] !== undefined) {
       matrix[item.type][item.level]++;
-      rowTotals[type]++;
+      rowTotals[item.type]++; // Fixed: was using 'type' instead of 'item.type'
       colTotals[item.level]++;
       total++;
     }
