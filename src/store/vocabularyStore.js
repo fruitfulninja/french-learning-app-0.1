@@ -16,7 +16,7 @@ const store = {
   indexWords(text) {
     if (!text) return;
     text.split(/[\s.,!?;:'"()[\]{}<>]+/)
-      .filter(word => word.length > 1)
+      .filter(word => word.length > 1 && !data.vocabulary[word])
       .forEach(word => {
         if (!data.vocabulary[word]) {
           data.vocabulary[word] = {

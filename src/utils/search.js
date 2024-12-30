@@ -21,7 +21,7 @@ export const performSearch = (data, searchTerm, typeFilter, levelFilter, fuseOpt
 
   // Get word variations and related words
   const wordInfo = getWordInfo(searchTerm);
-  const relatedWords = findRelatedWords(searchTerm);
+  const relatedWords = findRelatedWords(searchTerm).filter(word => word !== searchTerm);
 
   // Perform search and map results
   let result = fuse.search(normalizeText(searchTerm))

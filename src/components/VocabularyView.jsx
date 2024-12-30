@@ -35,7 +35,7 @@ const VocabularyView = ({ onSearchWord }) => {
       }
       return sortOrder === 'asc' ? comparison : -comparison;
     });
-  }, [vocabulary, filter, sortBy, sortOrder]);
+  }, [vocabulary, filter, sortBy, sortOrder, currentPage]);
 
   const totalPages = Math.ceil(sortedWords.length / ITEMS_PER_PAGE);
   const paginatedWords = sortedWords.slice(
