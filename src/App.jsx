@@ -65,6 +65,24 @@ const App = () => {
     setFilteredData(filtered);
   }, [debouncedSearch, typeFilter, levelFilter, data]);
 
+  // Add this right after your filtering useEffect
+  useEffect(() => {
+    console.log('-------DEBUG INFO-------');
+    console.log('Search term:', debouncedSearch);
+    console.log('Data array length:', data.length);
+    console.log('Filtered data length:', filteredData.length);
+    if (filteredData.length === 0 && data.length > 0) {
+      // Check the first item's content
+      console.log('Sample data item:', {
+        content: data[0]?.content,
+        choices: data[0]?.choices,
+        lowercased: (data[0]?.content + ' ' + (data[0]?.choices || '')).toLowerCase()
+      });
+      console.log('Search terms:', debouncedSearch.toLowerCase().split(/\s+/).filter(Boolean));
+    }
+    console.log('----------------------');
+  }, [debouncedSearch, data, filteredData]);
+
   const loadData = async () => {
     try {
       setLoading(true);
