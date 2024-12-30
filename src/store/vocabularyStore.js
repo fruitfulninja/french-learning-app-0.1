@@ -1,9 +1,7 @@
-import create from 'zustand';
-import { persist } from 'zustand/middleware';
 import { getBaseForm, getWordInfo } from '../utils/french';
 
-const useVocabularyStore = create(
-  persist(
+const useVocabularyStore = window.zustand(
+  window.persist(
     (set, get) => ({
       vocabulary: {}, // { word: { stars: number, lastUpdated: Date, type: string } }
       
