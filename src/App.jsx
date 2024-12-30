@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import Fuse from 'fuse.js';
 import SearchView from './components/SearchView';
 import { fixEncoding, normalizeText } from './utils/french.jsx';
-import { performSearch } from './utils/search.ts';
+import { performSearch } from './utils/search';
 
 // Tab configuration - makes it easy to add new features
 const TABS = {
