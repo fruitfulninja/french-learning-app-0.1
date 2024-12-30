@@ -2,9 +2,18 @@
 import Fuse from 'fuse.js';
 import { normalizeText, getWordInfo, findRelatedWords } from './french.js';
 
+// Add memoization cache
+const relatedWordsCache = new Map();
+
 export const performSearch = (data, searchTerm, typeFilter, levelFilter, fuseOptions) => {
   console.log('performSearch called with:', { searchTerm, typeFilter, levelFilter });
-  // Return filtered data if no search term
+  
+  // Add guard clause for invalid inputs
+  if (!data || !Array.isArray(data)) {
+    console.warn('Invalid data provided to performSearch');
+    return [];
+  }
+
   if (!searchTerm) {
     return filterByTypeAndLevel(data, typeFilter, levelFilter);
   }
@@ -20,15 +29,20 @@ export const performSearch = (data, searchTerm, typeFilter, levelFilter, fuseOpt
     ignoreLocation: true,
   });
 
-  // Get word variations and related words
+  // Get word variations and related words with memoization
   const wordInfo = getWordInfo(searchTerm);
-  const relatedWords = findRelatedWords(searchTerm).filter(word => word !== searchTerm);
-  console.log('relatedWords:', relatedWords);
-
-  // Prevent infinite recursion by limiting related words depth
-  if (relatedWords.length > 50) {
-    relatedWords.length = 50;
+  let relatedWords;
+  
+  if (relatedWordsCache.has(searchTerm)) {
+    relatedWords = relatedWordsCache.get(searchTerm);
+  } else {
+    relatedWords = findRelatedWords(searchTerm)
+      .filter(word => word !== searchTerm)
+      .slice(0, 50); // Limit related words to prevent stack overflow
+    relatedWordsCache.set(searchTerm, relatedWords);
   }
+
+  console.log('relatedWords:', relatedWords);
 
   // Perform search and map results
   let result = fuse.search(normalizeText(searchTerm))
@@ -51,6 +65,9 @@ export const performSearch = (data, searchTerm, typeFilter, levelFilter, fuseOpt
 
   return filterByTypeAndLevel(result, typeFilter, levelFilter);
 };
+
+// Clear cache periodically to prevent memory leaks
+setInterval(() => relatedWordsCache.clear(), 30 * 60 * 1000); // Clear every 30 minutes
 
 const filterByTypeAndLevel = (data, typeFilter, levelFilter) => {
   let filtered = data;
