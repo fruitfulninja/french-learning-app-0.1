@@ -1,6 +1,8 @@
 import React from 'react';
 import StatsTable from './StatsTable';
 import { highlightText } from '../utils/french';
+import useVocabularyStore from '../store/vocabularyStore';
+import { getBaseForm } from '../utils/french';
 
 const SearchView = ({ 
   data,
@@ -13,6 +15,14 @@ const SearchView = ({
   setLevelFilter,
   filteredData 
 }) => {
+  const { vocabulary, setStars } = useVocabularyStore();
+
+  const handleStarWord = (word) => {
+    const baseForm = getBaseForm(word);
+    const currentStars = vocabulary[baseForm]?.stars || 0;
+    setStars(baseForm, (currentStars % 5) + 1);
+  };
+
   return (
     <>
       <input
@@ -82,7 +92,16 @@ const SearchView = ({
             
             <div className="mt-4 text-lg leading-relaxed">
               <div className="text-gray-800 whitespace-pre-wrap">
-                {debouncedSearch ? highlightText(item.content, debouncedSearch) : item.content}
+                {debouncedSearch ? 
+                  highlightText(item.content, debouncedSearch).map((part, i) => 
+                    React.isValidElement(part) ? 
+                      React.cloneElement(part, {
+                        onClick: () => handleStarWord(part.props.children),
+                        className: part.props.className + ' cursor-pointer hover:text-blue-600'
+                      }) : 
+                      part
+                  ) : 
+                  item.content}
               </div>
               {item.choices && (
                 <div className="mt-4 text-gray-700 whitespace-pre-wrap border-t pt-4">

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import Fuse from 'fuse.js';
 import SearchView from './components/SearchView';
+import VocabularyView from './components/VocabularyView';
+import useVocabularyStore from './store/vocabularyStore';
 import { fixEncoding, normalizeText } from './utils/french.jsx';
 import { performSearch } from './utils/search';
 
@@ -11,6 +13,11 @@ const TABS = {
     id: 'search',
     label: 'Search Questions',
     component: SearchView
+  },
+  vocabulary: {
+    id: 'vocabulary',
+    label: 'Vocabulary List',
+    component: VocabularyView
   }
 };
 
@@ -146,6 +153,24 @@ const App = () => {
     }
   };
 
+  const { indexWords } = useVocabularyStore();
+
+  const handleSearch = (term) => {
+    setSearch(term);
+    setActiveTab('search');
+  };
+
+  // Add this to your useEffect for data loading
+  useEffect(() => {
+    if (data.length > 0) {
+      // Index all text content for vocabulary
+      const allText = data.map(item => 
+        `${item.content} ${item.choices || ''}`
+      ).join(' ');
+      indexWords(allText);
+    }
+  }, [data]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -198,6 +223,7 @@ const App = () => {
           setTypeFilter={setTypeFilter}
           setLevelFilter={setLevelFilter}
           filteredData={filteredData}
+          onSearchWord={handleSearch}
         />
       )}
     </div>
