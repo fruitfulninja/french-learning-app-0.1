@@ -41,16 +41,22 @@ const App = () => {
     loadData();
   }, []);
 
-  // Filter data when search or filters change
-  // In your useEffect for filtering data, update this part:
+  // Replace your current filtering useEffect with this:
   useEffect(() => {
     let filtered = [...data];  // Make a copy of the data array
 
     if (debouncedSearch) {
       const searchTerms = debouncedSearch.toLowerCase().split(/\s+/).filter(Boolean);
+      const searchVariations = searchTerms.flatMap(getWordVariations);
+
       filtered = filtered.filter(item => {
-        const content = (item.content + ' ' + (item.choices || '')).toLowerCase();
-        return searchTerms.every(term => content.includes(term));
+        const content = normalizeText(item.content + ' ' + (item.choices || ''));
+        // Item matches if it contains at least one variation of each search term
+        return searchTerms.every(term => 
+          searchVariations
+            .filter(v => v.startsWith(normalizeText(term)))
+            .some(variation => content.includes(variation))
+        );
       });
     }
 
