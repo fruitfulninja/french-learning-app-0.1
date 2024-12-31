@@ -1,91 +1,118 @@
 // store/vocabularyStore.js
 import { getBaseForm, normalizeText, isValidFrenchWord } from '../utils/french';
+import dbService from '../services/dbService';
 
 const data = {
-  vocabulary: JSON.parse(localStorage.getItem('french-vocabulary') || '{}')
+  vocabulary: {},
+  isInitialized: false
 };
 
-function saveVocabulary() {
-  console.log('Saving vocabulary to localStorage...');
-  try {
-    localStorage.setItem('french-vocabulary', JSON.stringify(data.vocabulary));
-    console.log('Vocabulary saved successfully');
-  } catch (error) {
-    console.error('Error saving vocabulary:', error);
+async function initializeStore() {
+  if (!data.isInitialized) {
+    console.log('Initializing vocabulary store...');
+    await dbService.init();
+    const words = await dbService.getAllWords();
+    data.vocabulary = words.reduce((acc, word) => {
+      acc[word.word] = word;
+      return acc;
+    }, {});
+    data.isInitialized = true;
+    console.log('Vocabulary store initialized');
   }
 }
 
 const createStore = () => {
   const store = {
-    getVocabulary() {
+    async getVocabulary() {
+      await initializeStore();
       return {...data.vocabulary};
     },
 
-    indexWords(text) {
-      console.log('Starting word indexing process...');
+    async indexWords(text) {
+      console.log('Indexing words...');
+      await initializeStore();
+      
       if (!text) return;
       
-      // Split text into words and clean up
-      const words = text.split(/[\s.,!?;:'"()[\]{}<>]+/)
-        .map(word => word.trim())
-        .filter(word => word.length > 0);
-      
-      console.log(`Processing ${words.length} potential words...`);
-      
-      // Use Set to deduplicate words before processing
       const uniqueWords = new Set(
-        words.filter(word => isValidFrenchWord(word))
+        text.split(/[\s.,!?;:'"()[\]{}<>]+/)
+          .filter(word => isValidFrenchWord(word))
       );
 
-      console.log(`Found ${uniqueWords.size} valid unique French words`);
+      console.log(`Processing ${uniqueWords.size} unique words`);
 
-      uniqueWords.forEach(word => {
+      for (const word of uniqueWords) {
         const baseForm = getBaseForm(word);
-        if (!data.vocabulary[baseForm]) {
-          data.vocabulary[baseForm] = {
-            stars: 0,
-            lastUpdated: new Date().toISOString(),
-            occurrences: 1
-          };
-        } else {
-          data.vocabulary[baseForm].occurrences++;
-        }
-      });
+        const existingWord = data.vocabulary[baseForm];
+        
+        const wordData = {
+          word: baseForm,
+          stars: existingWord?.stars || 0,
+          occurrences: (existingWord?.occurrences || 0) + 1,
+          notes: existingWord?.notes || '',
+          type: 'word',
+          lastUpdated: new Date().toISOString()
+        };
+
+        data.vocabulary[baseForm] = wordData;
+        await dbService.saveWord(baseForm, wordData);
+
+        // Save the context
+        await dbService.addContext(baseForm, {
+          text,
+          timestamp: new Date().toISOString()
+        });
+      }
 
       console.log('Word indexing completed');
-      saveVocabulary();
     },
 
-    setStars(word, stars) {
+    async setStars(word, stars) {
       console.log(`Setting ${stars} stars for word: ${word}`);
+      await initializeStore();
+      
       const baseForm = getBaseForm(word);
-      data.vocabulary[baseForm] = {
+      const wordData = {
         ...(data.vocabulary[baseForm] || {}),
+        word: baseForm,
         stars,
-        lastUpdated: new Date().toISOString(),
-        occurrences: (data.vocabulary[baseForm]?.occurrences || 0)
+        lastUpdated: new Date().toISOString()
       };
-      saveVocabulary();
+
+      data.vocabulary[baseForm] = wordData;
+      await dbService.saveWord(baseForm, wordData);
     },
 
-    removeWord(word) {
-      console.log(`Removing word: ${word}`);
+    async addNote(word, note) {
+      console.log(`Adding note for word: ${word}`);
+      await initializeStore();
+      
       const baseForm = getBaseForm(word);
-      delete data.vocabulary[baseForm];
-      saveVocabulary();
+      const wordData = {
+        ...(data.vocabulary[baseForm] || {}),
+        word: baseForm,
+        notes: note,
+        lastUpdated: new Date().toISOString()
+      };
+
+      data.vocabulary[baseForm] = wordData;
+      await dbService.saveWord(baseForm, wordData);
     },
 
-    exportVocabulary() {
+    async exportVocabulary() {
       console.log('Starting vocabulary export...');
-      const csvContent = ['Word,Stars,Occurrences,Last Updated']
-        .concat(Object.entries(data.vocabulary)
-          .map(([word, info]) => 
-            [
-              word,
-              info.stars || 0,
-              info.occurrences || 0,
-              info.lastUpdated || new Date().toISOString()
-            ].join(','))
+      await initializeStore();
+      
+      const data = await dbService.exportData();
+      const csvContent = ['Word,Stars,Occurrences,Notes,Last Updated']
+        .concat(data.map(item => 
+          [
+            item.word,
+            item.stars || 0,
+            item.occurrences || 0,
+            `"${item.notes || ''}"`,
+            item.lastUpdated || new Date().toISOString()
+          ].join(','))
         ).join('\n');
 
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -95,7 +122,32 @@ const createStore = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      console.log('Vocabulary export completed');
+    },
+
+    async importVocabulary(csvContent) {
+      console.log('Starting vocabulary import...');
+      await initializeStore();
+      
+      // Parse CSV and convert to proper format
+      const lines = csvContent.split('\n');
+      const headers = lines[0].split(',');
+      
+      const importData = lines.slice(1).map(line => {
+        const values = line.split(',');
+        return headers.reduce((obj, header, index) => {
+          obj[header.trim()] = values[index];
+          return obj;
+        }, {});
+      });
+
+      await dbService.importData(importData);
+      
+      // Refresh local data
+      const words = await dbService.getAllWords();
+      data.vocabulary = words.reduce((acc, word) => {
+        acc[word.word] = word;
+        return acc;
+      }, {});
     }
   };
 
