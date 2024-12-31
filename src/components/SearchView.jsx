@@ -1,5 +1,5 @@
 // components/SearchView.jsx
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import StatsTable from './StatsTable';
 import useVocabularyStore from '../store/vocabularyStore';
 import { getBaseForm } from '../utils/french';
@@ -15,15 +15,19 @@ const SearchView = ({
   setLevelFilter,
   filteredData 
 }) => {
+  console.log('SearchView render');
   const vocabularyStore = useVocabularyStore();
 
-  const handleStarWord = (word) => {
+  // Memoize handler to prevent recreation on every render
+  const handleStarWord = useCallback((word) => {
+    console.log('Starring word:', word);
     const baseForm = getBaseForm(word);
-    const currentStars = vocabularyStore.vocabulary[baseForm]?.stars || 0;
+    const currentStars = vocabularyStore.getVocabulary()[baseForm]?.stars || 0;
     vocabularyStore.setStars(baseForm, (currentStars % 5) + 1);
-  };
+  }, [vocabularyStore]);
 
-  const renderHighlightedText = (text, searchTerm) => {
+  // Memoize text rendering function
+  const renderHighlightedText = useCallback((text, searchTerm) => {
     if (!searchTerm || !text) return text;
     
     const parts = text.split(new RegExp(`(${searchTerm})`, 'gi'));
@@ -42,10 +46,16 @@ const SearchView = ({
       }
       return part;
     });
-  };
+  }, [handleStarWord]);
+
+  // Memoize filtered data stats
+  const stats = useMemo(() => ({
+    total: data.length,
+    filtered: filteredData.length,
+  }), [data.length, filteredData.length]);
 
   return (
-    <>
+    <div className="space-y-6">
       <input
         type="text"
         value={search}
@@ -66,7 +76,7 @@ const SearchView = ({
             activeLevel={levelFilter}
           />
           <div className="text-lg text-gray-600">
-            Showing {filteredData.length} of {data.length} questions
+            Showing {stats.filtered} of {stats.total} questions
           </div>
         </div>
       )}
@@ -128,8 +138,9 @@ const SearchView = ({
           </div>
         ))}
       </div>
-    </>
+    </div>
   );
 };
 
-export default SearchView;
+// Wrap with memo to prevent unnecessary rerenders
+export default React.memo(SearchView);
