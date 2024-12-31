@@ -1,5 +1,5 @@
 // store/vocabularyStore.js
-import { getBaseForm, normalizeText } from '../utils/french';
+import { getBaseForm, normalizeText, isValidFrenchWord } from '../utils/french';
 
 const data = {
   vocabulary: JSON.parse(localStorage.getItem('french-vocabulary') || '{}')
@@ -16,22 +16,28 @@ function saveVocabulary() {
 }
 
 const createStore = () => {
-  // Create closure to prevent external modification
   const store = {
     getVocabulary() {
-      return {...data.vocabulary};  // Return copy to prevent direct mutation
+      return {...data.vocabulary};
     },
 
     indexWords(text) {
-      console.log('Indexing words...');
+      console.log('Starting word indexing process...');
       if (!text) return;
+      
+      // Split text into words and clean up
+      const words = text.split(/[\s.,!?;:'"()[\]{}<>]+/)
+        .map(word => word.trim())
+        .filter(word => word.length > 0);
+      
+      console.log(`Processing ${words.length} potential words...`);
       
       // Use Set to deduplicate words before processing
       const uniqueWords = new Set(
-        text.split(/[\s.,!?;:'"()[\]{}<>]+/)
-          .filter(word => word.length > 1)
-          .map(word => normalizeText(word))
+        words.filter(word => isValidFrenchWord(word))
       );
+
+      console.log(`Found ${uniqueWords.size} valid unique French words`);
 
       uniqueWords.forEach(word => {
         const baseForm = getBaseForm(word);
@@ -46,12 +52,12 @@ const createStore = () => {
         }
       });
 
-      console.log(`Indexed ${uniqueWords.size} unique words`);
+      console.log('Word indexing completed');
       saveVocabulary();
     },
 
     setStars(word, stars) {
-      console.log(`Setting stars for word: ${word}`);
+      console.log(`Setting ${stars} stars for word: ${word}`);
       const baseForm = getBaseForm(word);
       data.vocabulary[baseForm] = {
         ...(data.vocabulary[baseForm] || {}),
@@ -62,8 +68,15 @@ const createStore = () => {
       saveVocabulary();
     },
 
+    removeWord(word) {
+      console.log(`Removing word: ${word}`);
+      const baseForm = getBaseForm(word);
+      delete data.vocabulary[baseForm];
+      saveVocabulary();
+    },
+
     exportVocabulary() {
-      console.log('Exporting vocabulary...');
+      console.log('Starting vocabulary export...');
       const csvContent = ['Word,Stars,Occurrences,Last Updated']
         .concat(Object.entries(data.vocabulary)
           .map(([word, info]) => 
@@ -82,6 +95,7 @@ const createStore = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      console.log('Vocabulary export completed');
     }
   };
 

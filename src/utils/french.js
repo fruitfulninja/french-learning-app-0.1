@@ -25,6 +25,39 @@ export const normalizeText = (text) => {
     .replace(/[\u0300-\u036f]/g, '');
 };
 
+// New function to validate French words
+export const isValidFrenchWord = (word) => {
+  // Remove any leading/trailing spaces
+  word = word.trim();
+  
+  // Skip if too short or too long
+  if (word.length < 2 || word.length > 30) return false;
+  
+  // Skip numbers and symbols
+  if (/[\d!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]/.test(word)) return false;
+  
+  // Skip if contains multiple dots or hyphens (likely not a word)
+  if ((word.match(/\./g) || []).length > 1) return false;
+  if ((word.match(/-/g) || []).length > 2) return false;
+  
+  // Skip common non-word elements
+  const nonWords = [
+    'www', 'http', 'https', 'com', 'fr', 'org',
+    'le', 'la', 'les', 'un', 'une', 'des', // Skip articles when alone
+    'et', 'ou', 'ni', // Skip common conjunctions when alone
+    'de', 'du', 'des', 'au', 'aux', // Skip common prepositions when alone
+  ];
+  
+  if (nonWords.includes(word.toLowerCase())) return false;
+  
+  // Skip words that are just punctuation or special characters
+  if (/^[.,!?;:'"()[\]{}<>]+$/.test(word)) return false;
+  
+  // Accept words with French characters
+  const frenchPattern = /^[a-zàâäçéèêëîïôöùûüæœ'-]+$/i;
+  return frenchPattern.test(word);
+};
+
 export const getBaseForm = (word) => {
   const normalized = word.toLowerCase()
     .normalize('NFD')
@@ -39,184 +72,23 @@ export const getBaseForm = (word) => {
     for (const commonEnding of commonEndings) {
       if (normalized.endsWith(commonEnding)) {
         const stem = normalized.slice(0, -commonEnding.length);
-        return stem + 'er';  // Most common case, could be expanded for -ir/-re verbs
+        return stem + 'er';  // Most common case
       }
     }
   }
   return word;
 };
 
-const irregularWords = {
+const irregularVerbs = {
   'être': ['suis', 'es', 'est', 'sommes', 'êtes', 'sont', 'été'],
   'avoir': ['ai', 'as', 'a', 'avons', 'avez', 'ont', 'eu'],
-  'aller': ['vais', 'vas', 'va', 'allons', 'allez', 'vont', 'allé', 'allée', 'allés', 'allées'],
+  'aller': ['vais', 'vas', 'va', 'allons', 'allez', 'vont', 'allé'],
   'faire': ['fais', 'fait', 'faisons', 'faites', 'font'],
   'dire': ['dis', 'dit', 'disons', 'dites', 'disent'],
-  'pouvoir': ['peux', 'peut', 'pouvons', 'pouvez', 'peuvent', 'pu'],
-  'vouloir': ['veux', 'veut', 'voulons', 'voulez', 'veulent', 'voulu'],
-  'devoir': ['dois', 'doit', 'devons', 'devez', 'doivent', 'dû'],
-  'savoir': ['sais', 'sait', 'savons', 'savez', 'savent', 'su'],
+  'pouvoir': ['peux', 'peut', 'pouvons', 'pouvez', 'peuvent'],
+  'vouloir': ['veux', 'veut', 'voulons', 'voulez', 'veulent'],
+  'devoir': ['dois', 'doit', 'devons', 'devez', 'doivent'],
+  'savoir': ['sais', 'sait', 'savons', 'savez', 'savent'],
 };
 
-const vocabularyData = {
-  nouns: {
-    gender: ['masculine', 'feminine'],
-    number: ['singular', 'plural'],
-    relationships: {
-      'maison': { gender: 'feminine', related: ['appartement', 'logement', 'habitation'] },
-      'chat': { gender: 'masculine', related: ['chatte', 'chaton', 'félin'] },
-      // Add more nouns as needed
-    }
-  },
-  adjectives: {
-    forms: {
-      'beau': ['belle', 'beaux', 'belles'],
-      'nouveau': ['nouvelle', 'nouveaux', 'nouvelles'],
-      'grand': ['grande', 'grands', 'grandes'],
-      // Add more adjectives as needed
-    }
-  },
-  expressions: {
-    'avoir lieu': { meaning: 'to take place', register: 'standard' },
-    'tout à fait': { meaning: 'completely', register: 'standard' },
-    // Add more expressions as needed
-  }
-};
-
-export const findRelatedWords = (word) => {
-  const normalized = normalizeText(word);
-  const results = new Set();
-
-  // Check nouns
-  for (const [noun, data] of Object.entries(vocabularyData.nouns.relationships)) {
-    if (normalized === normalizeText(noun)) {
-      data.related.forEach(related => results.add(related));
-      break;
-    }
-  }
-
-  // Check adjectives
-  for (const [adj, forms] of Object.entries(vocabularyData.adjectives.forms)) {
-    if (normalized === normalizeText(adj) || forms.some(f => normalized === normalizeText(f))) {
-      results.add(adj);
-      forms.forEach(form => results.add(form));
-    }
-  }
-
-  // Check expressions
-  for (const expression of Object.keys(vocabularyData.expressions)) {
-    if (expression.includes(word)) {
-      results.add(expression);
-    }
-  }
-
-  return Array.from(results);
-};
-
-export const getWordInfo = (word) => {
-  const normalized = normalizeText(word);
-  
-  // Check nouns
-  for (const [noun, data] of Object.entries(vocabularyData.nouns.relationships)) {
-    if (normalized === normalizeText(noun)) {
-      return {
-        type: 'noun',
-        gender: data.gender,
-        related: data.related
-      };
-    }
-  }
-
-  // Check adjectives
-  for (const [adj, forms] of Object.entries(vocabularyData.adjectives.forms)) {
-    if (normalized === normalizeText(adj) || forms.some(f => normalized === normalizeText(f))) {
-      return {
-        type: 'adjective',
-        forms: [adj, ...forms]
-      };
-    }
-  }
-
-  // Check expressions
-  for (const [expr, data] of Object.entries(vocabularyData.expressions)) {
-    if (expr.includes(word)) {
-      return {
-        type: 'expression',
-        meaning: data.meaning,
-        register: data.register
-      };
-    }
-  }
-
-  // Check verbs (using existing irregular words and verb detection)
-  if (irregularWords[normalized]) {
-    return {
-      type: 'verb',
-      conjugations: irregularWords[normalized],
-      isIrregular: true
-    };
-  }
-
-  const base = getBaseForm(word);
-  if (base.endsWith('er') || base.endsWith('ir') || base.endsWith('re')) {
-    return {
-      type: 'verb',
-      conjugations: getWordVariations(base),
-      isIrregular: false
-    };
-  }
-
-  return null;
-};
-
-export const getWordVariations = (word) => {
-  const normalized = normalizeText(word);
-  const variations = new Set([normalized]);
-  
-  // Add vocabulary-based variations
-  const wordInfo = getWordInfo(word);
-  if (wordInfo) {
-    switch (wordInfo.type) {
-      case 'noun':
-        wordInfo.related.forEach(related => variations.add(normalizeText(related)));
-        break;
-      case 'adjective':
-        wordInfo.forms.forEach(form => variations.add(normalizeText(form)));
-        break;
-      case 'verb':
-        wordInfo.conjugations.forEach(conj => variations.add(normalizeText(conj)));
-        break;
-    }
-  }
-
-  // Handle regular verb conjugations
-  if (normalized.endsWith('er')) {
-    const stem = normalized.slice(0, -2);
-    variations.add(stem + 'e');
-    variations.add(stem + 'es');
-    variations.add(stem + 'ent');
-    variations.add(stem + 'é');
-    variations.add(stem + 'ée');
-    variations.add(stem + 'és');
-    variations.add(stem + 'ées');
-    variations.add(stem + 'ant');
-  }
-
-  return Array.from(variations);
-};
-
-export const highlightText = (text, searchTerm) => {
-  if (!searchTerm || !text) return text;
-  const variations = searchTerm.toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
-    .flatMap(getWordVariations);
-  
-  const pattern = variations
-    .map(v => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    .join('|');
-  
-  const parts = text.split(new RegExp(`(${pattern})`, 'gi'));
-  
-  return parts;
-};
+// Add more French language data as needed...
