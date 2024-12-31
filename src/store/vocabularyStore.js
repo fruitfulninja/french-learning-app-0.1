@@ -4,6 +4,7 @@ import dbService from '../services/dbService';
 
 let data = {
   vocabulary: {},
+  ratings: {},
   isInitialized: false
 };
 
@@ -11,11 +12,14 @@ async function initializeStore() {
   if (!data.isInitialized) {
     console.log('Initializing vocabulary store...');
     await dbService.init();
-    const words = await dbService.getAllWords();
-    data.vocabulary = words.reduce((acc, word) => {
-      acc[word.word] = word;
+    const ratings = await dbService.getAllRatings();
+    
+    // Convert ratings array to object for easier lookup
+    data.ratings = ratings.reduce((acc, rating) => {
+      acc[rating.word] = rating;
       return acc;
     }, {});
+    
     data.isInitialized = true;
     console.log('Vocabulary store initialized');
   }
@@ -24,7 +28,15 @@ async function initializeStore() {
 function createVocabularyStore() {
   return {
     getVocabulary() {
-      return data.vocabulary;
+      // Combine vocabulary with ratings
+      return Object.entries(data.vocabulary).reduce((acc, [word, wordData]) => {
+        acc[word] = {
+          ...wordData,
+          stars: data.ratings[word]?.stars || 0,
+          notes: data.ratings[word]?.notes || ''
+        };
+        return acc;
+      }, {});
     },
 
     async initializeIfNeeded() {
@@ -48,23 +60,12 @@ function createVocabularyStore() {
         const baseForm = getBaseForm(word);
         const existingWord = data.vocabulary[baseForm];
         
-        const wordData = {
+        data.vocabulary[baseForm] = {
           word: baseForm,
-          stars: existingWord?.stars || 0,
           occurrences: (existingWord?.occurrences || 0) + 1,
-          notes: existingWord?.notes || '',
           type: 'word',
           lastUpdated: new Date().toISOString()
         };
-
-        data.vocabulary[baseForm] = wordData;
-        await dbService.saveWord(baseForm, wordData);
-
-        // Save the context
-        await dbService.addContext(baseForm, {
-          text,
-          timestamp: new Date().toISOString()
-        });
       }
 
       console.log('Word indexing completed');
@@ -75,15 +76,17 @@ function createVocabularyStore() {
       await initializeStore();
       
       const baseForm = getBaseForm(word);
-      const wordData = {
-        ...(data.vocabulary[baseForm] || {}),
-        word: baseForm,
+      const ratingData = {
         stars,
+        notes: data.ratings[baseForm]?.notes || '',
         lastUpdated: new Date().toISOString()
       };
 
-      data.vocabulary[baseForm] = wordData;
-      await dbService.saveWord(baseForm, wordData);
+      // Update local data
+      data.ratings[baseForm] = ratingData;
+      
+      // Save to database
+      await dbService.saveRating(baseForm, ratingData);
     },
 
     async addNote(word, note) {
@@ -91,28 +94,56 @@ function createVocabularyStore() {
       await initializeStore();
       
       const baseForm = getBaseForm(word);
-      const wordData = {
-        ...(data.vocabulary[baseForm] || {}),
-        word: baseForm,
+      const ratingData = {
+        stars: data.ratings[baseForm]?.stars || 0,
         notes: note,
         lastUpdated: new Date().toISOString()
       };
 
-      data.vocabulary[baseForm] = wordData;
-      await dbService.saveWord(baseForm, wordData);
+      // Update local data
+      data.ratings[baseForm] = ratingData;
+      
+      // Save to database
+      await dbService.saveRating(baseForm, ratingData);
     },
 
     async exportVocabulary() {
       console.log('Starting vocabulary export...');
       await initializeStore();
-      return dbService.exportFullData();
+      
+      const vocabulary = this.getVocabulary();
+      const exportData = Object.entries(vocabulary).map(([word, data]) => ({
+        word,
+        stars: data.stars || 0,
+        notes: data.notes || '',
+        occurrences: data.occurrences || 0,
+        lastUpdated: data.lastUpdated
+      }));
+
+      // Create CSV
+      const csvContent = ['Word,Stars,Notes,Occurrences,Last Updated']
+        .concat(exportData.map(entry => 
+          [
+            entry.word,
+            entry.stars,
+            `"${entry.notes.replace(/"/g, '""')}"`,
+            entry.occurrences,
+            entry.lastUpdated
+          ].join(','))
+        ).join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `french-vocabulary-${new Date().toISOString()}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
   };
 }
 
 const store = createVocabularyStore();
-
-// Custom hook for using the vocabulary store
 export default function useVocabularyStore() {
   return store;
 }

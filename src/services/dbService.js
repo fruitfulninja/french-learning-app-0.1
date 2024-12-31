@@ -27,57 +27,50 @@ class DatabaseService {
           console.log('Creating/upgrading database schema...');
           const db = event.target.result;
   
-          if (!db.objectStoreNames.contains('vocabulary')) {
-            const store = db.createObjectStore('vocabulary', { keyPath: 'word' });
+          // Create ratings store
+          if (!db.objectStoreNames.contains('ratings')) {
+            const store = db.createObjectStore('ratings', { keyPath: 'word' });
             store.createIndex('lastUpdated', 'lastUpdated');
             store.createIndex('stars', 'stars');
-            store.createIndex('type', 'type');
-            console.log('Created vocabulary store');
-          }
-  
-          if (!db.objectStoreNames.contains('contexts')) {
-            const contextStore = db.createObjectStore('contexts', { keyPath: 'id', autoIncrement: true });
-            contextStore.createIndex('word', 'word');
-            contextStore.createIndex('timestamp', 'timestamp');
-            console.log('Created contexts store');
+            console.log('Created ratings store');
           }
         };
       });
     }
   
-    async saveWord(word, data) {
-      console.log('Saving word:', word);
+    async saveRating(word, data) {
+      console.log('Saving rating for word:', word);
       return new Promise((resolve, reject) => {
-        const transaction = this.db.transaction(['vocabulary'], 'readwrite');
-        const store = transaction.objectStore('vocabulary');
+        const transaction = this.db.transaction(['ratings'], 'readwrite');
+        const store = transaction.objectStore('ratings');
   
         const request = store.put({
           word,
-          ...data,
+          stars: data.stars || 0,
+          notes: data.notes || '',
           lastUpdated: new Date().toISOString()
         });
   
         request.onsuccess = () => {
-          console.log('Word saved successfully');
+          console.log('Rating saved successfully');
           resolve();
         };
   
         request.onerror = () => {
-          console.error('Error saving word:', request.error);
+          console.error('Error saving rating:', request.error);
           reject(request.error);
         };
       });
     }
   
-    async getWord(word) {
-      console.log('Fetching word:', word);
+    async getRating(word) {
       return new Promise((resolve, reject) => {
-        const transaction = this.db.transaction(['vocabulary'], 'readonly');
-        const store = transaction.objectStore('vocabulary');
+        const transaction = this.db.transaction(['ratings'], 'readonly');
+        const store = transaction.objectStore('ratings');
         const request = store.get(word);
   
         request.onsuccess = () => {
-          resolve(request.result);
+          resolve(request.result || { stars: 0, notes: '' });
         };
   
         request.onerror = () => {
@@ -86,11 +79,10 @@ class DatabaseService {
       });
     }
   
-    async getAllWords() {
-      console.log('Fetching all words');
+    async getAllRatings() {
       return new Promise((resolve, reject) => {
-        const transaction = this.db.transaction(['vocabulary'], 'readonly');
-        const store = transaction.objectStore('vocabulary');
+        const transaction = this.db.transaction(['ratings'], 'readonly');
+        const store = transaction.objectStore('ratings');
         const request = store.getAll();
   
         request.onsuccess = () => {
@@ -102,89 +94,8 @@ class DatabaseService {
         };
       });
     }
-  
-    async exportFullData() {
-      console.log('Starting full data export...');
-      try {
-        const words = await this.getAllWords();
-        const contexts = await Promise.all(
-          words.map(word => this.getContexts(word.word))
-        );
-  
-        const completeData = words.map((word, index) => ({
-          ...word,
-          contexts: contexts[index],
-          exportDate: new Date().toISOString(),
-          version: this.version
-        }));
-  
-        // Create JSON file
-        const jsonContent = JSON.stringify(completeData, null, 2);
-        const jsonBlob = new Blob([jsonContent], { type: 'application/json' });
-        
-        // Create filename with timestamp
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = `french-vocabulary-backup-${timestamp}.json`;
-  
-        // Trigger download
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(jsonBlob);
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-  
-        console.log('Export completed successfully');
-        return completeData;
-  
-      } catch (error) {
-        console.error('Export failed:', error);
-        throw error;
-      }
-    }
-  
-    async getContexts(word) {
-      console.log('Fetching contexts for word:', word);
-      return new Promise((resolve, reject) => {
-        const transaction = this.db.transaction(['contexts'], 'readonly');
-        const store = transaction.objectStore('contexts');
-        const index = store.index('word');
-        const request = index.getAll(word);
-  
-        request.onsuccess = () => {
-          resolve(request.result);
-        };
-  
-        request.onerror = () => {
-          reject(request.error);
-        };
-      });
-    }
-  
-    async addContext(word, context) {
-      console.log('Adding context for word:', word);
-      return new Promise((resolve, reject) => {
-        const transaction = this.db.transaction(['contexts'], 'readwrite');
-        const store = transaction.objectStore('contexts');
-  
-        const request = store.add({
-          word,
-          context,
-          timestamp: new Date().toISOString()
-        });
-  
-        request.onsuccess = () => {
-          console.log('Context added successfully');
-          resolve();
-        };
-  
-        request.onerror = () => {
-          reject(request.error);
-        };
-      });
-    }
   }
   
-  // Create and export a single instance
+  // Create and export singleton instance
   const dbService = new DatabaseService();
   export default dbService;
