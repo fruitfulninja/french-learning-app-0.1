@@ -102,52 +102,7 @@ const createStore = () => {
     async exportVocabulary() {
       console.log('Starting vocabulary export...');
       await initializeStore();
-      
-      const data = await dbService.exportData();
-      const csvContent = ['Word,Stars,Occurrences,Notes,Last Updated']
-        .concat(data.map(item => 
-          [
-            item.word,
-            item.stars || 0,
-            item.occurrences || 0,
-            `"${item.notes || ''}"`,
-            item.lastUpdated || new Date().toISOString()
-          ].join(','))
-        ).join('\n');
-
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = 'french-vocabulary.csv';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    },
-
-    async importVocabulary(csvContent) {
-      console.log('Starting vocabulary import...');
-      await initializeStore();
-      
-      // Parse CSV and convert to proper format
-      const lines = csvContent.split('\n');
-      const headers = lines[0].split(',');
-      
-      const importData = lines.slice(1).map(line => {
-        const values = line.split(',');
-        return headers.reduce((obj, header, index) => {
-          obj[header.trim()] = values[index];
-          return obj;
-        }, {});
-      });
-
-      await dbService.importData(importData);
-      
-      // Refresh local data
-      const words = await dbService.getAllWords();
-      data.vocabulary = words.reduce((acc, word) => {
-        acc[word.word] = word;
-        return acc;
-      }, {});
+      return dbService.exportFullData();
     }
   };
 

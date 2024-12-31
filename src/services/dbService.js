@@ -1,6 +1,6 @@
 // services/dbService.js
 
-export class DatabaseService {
+class DatabaseService {
     constructor() {
       this.dbName = 'frenchLearningDB';
       this.version = 1;
@@ -27,7 +27,6 @@ export class DatabaseService {
           console.log('Creating/upgrading database schema...');
           const db = event.target.result;
   
-          // Create vocabulary store with indexes
           if (!db.objectStoreNames.contains('vocabulary')) {
             const store = db.createObjectStore('vocabulary', { keyPath: 'word' });
             store.createIndex('lastUpdated', 'lastUpdated');
@@ -36,7 +35,6 @@ export class DatabaseService {
             console.log('Created vocabulary store');
           }
   
-          // Create contexts store for usage examples
           if (!db.objectStoreNames.contains('contexts')) {
             const contextStore = db.createObjectStore('contexts', { keyPath: 'id', autoIncrement: true });
             contextStore.createIndex('word', 'word');
@@ -105,6 +103,64 @@ export class DatabaseService {
       });
     }
   
+    async exportFullData() {
+      console.log('Starting full data export...');
+      try {
+        const words = await this.getAllWords();
+        const contexts = await Promise.all(
+          words.map(word => this.getContexts(word.word))
+        );
+  
+        const completeData = words.map((word, index) => ({
+          ...word,
+          contexts: contexts[index],
+          exportDate: new Date().toISOString(),
+          version: this.version
+        }));
+  
+        // Create JSON file
+        const jsonContent = JSON.stringify(completeData, null, 2);
+        const jsonBlob = new Blob([jsonContent], { type: 'application/json' });
+        
+        // Create filename with timestamp
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `french-vocabulary-backup-${timestamp}.json`;
+  
+        // Trigger download
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(jsonBlob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+  
+        console.log('Export completed successfully');
+        return completeData;
+  
+      } catch (error) {
+        console.error('Export failed:', error);
+        throw error;
+      }
+    }
+  
+    async getContexts(word) {
+      console.log('Fetching contexts for word:', word);
+      return new Promise((resolve, reject) => {
+        const transaction = this.db.transaction(['contexts'], 'readonly');
+        const store = transaction.objectStore('contexts');
+        const index = store.index('word');
+        const request = index.getAll(word);
+  
+        request.onsuccess = () => {
+          resolve(request.result);
+        };
+  
+        request.onerror = () => {
+          reject(request.error);
+        };
+      });
+    }
+  
     async addContext(word, context) {
       console.log('Adding context for word:', word);
       return new Promise((resolve, reject) => {
@@ -127,66 +183,8 @@ export class DatabaseService {
         };
       });
     }
-  
-    async getContexts(word) {
-      console.log('Fetching contexts for word:', word);
-      return new Promise((resolve, reject) => {
-        const transaction = this.db.transaction(['contexts'], 'readonly');
-        const store = transaction.objectStore('contexts');
-        const index = store.index('word');
-        const request = index.getAll(word);
-  
-        request.onsuccess = () => {
-          resolve(request.result);
-        };
-  
-        request.onerror = () => {
-          reject(request.error);
-        };
-      });
-    }
-  
-    async exportData() {
-      console.log('Starting data export...');
-      const words = await this.getAllWords();
-      const contexts = await Promise.all(
-        words.map(word => this.getContexts(word.word))
-      );
-  
-      const exportData = words.map((word, index) => ({
-        ...word,
-        contexts: contexts[index]
-      }));
-  
-      return exportData;
-    }
-  
-    async importData(data) {
-      console.log('Starting data import...');
-      const transaction = this.db.transaction(['vocabulary', 'contexts'], 'readwrite');
-      const vocabStore = transaction.objectStore('vocabulary');
-      const contextStore = transaction.objectStore('contexts');
-  
-      return new Promise((resolve, reject) => {
-        transaction.oncomplete = () => {
-          console.log('Import completed successfully');
-          resolve();
-        };
-  
-        transaction.onerror = () => {
-          reject(transaction.error);
-        };
-  
-        data.forEach(item => {
-          const { contexts, ...wordData } = item;
-          vocabStore.put(wordData);
-          contexts?.forEach(context => {
-            contextStore.add(context);
-          });
-        });
-      });
-    }
   }
   
-  // Create and export singleton instance
-  export const dbService = new DatabaseService();
+  // Create and export a single instance
+  const dbService = new DatabaseService();
+  export default dbService;
