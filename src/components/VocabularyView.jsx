@@ -1,83 +1,119 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import useVocabularyStore from '../store/vocabularyStore';
 
-const ITEMS_PER_PAGE = 20;
+const ITEMS_PER_PAGE = 50;
+
+const VocabularyTable = React.memo(({ words, onStarClick, onSearchWord }) => {
+  return (
+    <table className="min-w-full">
+      <thead className="bg-gray-50">
+        <tr>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Word</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Confidence</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Occurrences</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+        </tr>
+      </thead>
+      <tbody className="bg-white divide-y divide-gray-200">
+        {words.map(([word, data]) => (
+          <tr key={word} className="hover:bg-gray-50">
+            <td className="px-6 py-4">{word}</td>
+            <td className="px-6 py-4">
+              <div className="flex gap-1">
+                {[1, 2, 3, 4, 5].map(star => (
+                  <button
+                    key={star}
+                    onClick={() => onStarClick(word, star)}
+                    className={`w-6 h-6 ${
+                      star <= (data.stars || 0)
+                        ? 'text-yellow-400'
+                        : 'text-gray-300'
+                    }`}
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+            </td>
+            <td className="px-6 py-4">
+              {data.occurrences || 0}
+            </td>
+            <td className="px-6 py-4">
+              <button
+                onClick={() => onSearchWord(word)}
+                className="text-blue-600 hover:text-blue-900"
+              >
+                Search
+              </button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+});
 
 const VocabularyView = ({ onSearchWord }) => {
   const vocabularyStore = useVocabularyStore();
-  const [vocabulary, setVocabulary] = useState({});
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState('');
-  const [sortBy, setSortBy] = useState('word');
-  const [sortOrder, setSortOrder] = useState('asc');
   const [currentPage, setCurrentPage] = useState(1);
+  const [vocabulary, setVocabulary] = useState({});
 
-  // Load vocabulary data
+  // Initialize store
   useEffect(() => {
-    async function loadVocabulary() {
+    const initStore = async () => {
       try {
-        setLoading(true);
-        console.log('Loading vocabulary data...');
-        const vocabData = await vocabularyStore.getVocabulary();
-        console.log('Loaded vocabulary:', vocabData);
-        setVocabulary(vocabData);
+        setIsLoading(true);
+        await vocabularyStore.initializeIfNeeded();
+        setVocabulary(vocabularyStore.getVocabulary());
       } catch (error) {
-        console.error('Error loading vocabulary:', error);
+        console.error('Failed to initialize vocabulary:', error);
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
-    }
+    };
 
-    loadVocabulary();
+    initStore();
   }, [vocabularyStore]);
 
-  const sortedWords = useMemo(() => {
-    console.log('Sorting words with filter:', filter);
-    console.log('Current vocabulary:', vocabulary);
-    
-    const words = Object.entries(vocabulary)
+  // Debounce filter changes
+  const filterTimeout = useRef(null);
+  const handleFilterChange = (e) => {
+    if (filterTimeout.current) {
+      clearTimeout(filterTimeout.current);
+    }
+    filterTimeout.current = setTimeout(() => {
+      setFilter(e.target.value);
+      setCurrentPage(1);
+    }, 150);
+  };
+
+  // Memoize filtered and sorted words
+  const filteredWords = useMemo(() => {
+    return Object.entries(vocabulary)
       .filter(([word]) => 
         word.toLowerCase().includes(filter.toLowerCase())
-      );
+      )
+      .sort((a, b) => b[1].occurrences - a[1].occurrences);
+  }, [vocabulary, filter]);
 
-    console.log('Filtered words:', words);
-
-    return words.sort(([wordA, dataA], [wordB, dataB]) => {
-      let comparison = 0;
-      switch (sortBy) {
-        case 'word':
-          comparison = wordA.localeCompare(wordB);
-          break;
-        case 'stars':
-          comparison = (dataA.stars || 0) - (dataB.stars || 0);
-          break;
-        case 'lastUpdated':
-          comparison = new Date(dataA.lastUpdated || 0) - new Date(dataB.lastUpdated || 0);
-          break;
-        default:
-          comparison = 0;
-      }
-      return sortOrder === 'asc' ? comparison : -comparison;
-    });
-  }, [vocabulary, filter, sortBy, sortOrder]);
-
-  const totalPages = Math.ceil(sortedWords.length / ITEMS_PER_PAGE);
-  const paginatedWords = sortedWords.slice(
+  const totalPages = Math.ceil(filteredWords.length / ITEMS_PER_PAGE);
+  const paginatedWords = filteredWords.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
 
-  const handleSort = (key) => {
-    if (sortBy === key) {
-      setSortOrder(order => order === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(key);
-      setSortOrder('asc');
-    }
-    setCurrentPage(1);
-  };
+  const handleStarClick = useCallback(async (word, stars) => {
+    await vocabularyStore.setStars(word, stars);
+    setVocabulary(vocabularyStore.getVocabulary());
+  }, [vocabularyStore]);
 
-  if (loading) {
+  const handleExport = useCallback(async () => {
+    await vocabularyStore.exportVocabulary();
+  }, [vocabularyStore]);
+
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center h-48">
         <div className="text-lg text-gray-600">Loading vocabulary...</div>
@@ -90,147 +126,52 @@ const VocabularyView = ({ onSearchWord }) => {
       <div className="flex justify-between items-center">
         <input
           type="text"
-          value={filter}
-          onChange={(e) => {
-            setFilter(e.target.value);
-            setCurrentPage(1);
-          }}
+          onChange={handleFilterChange}
           placeholder="Filter words..."
           className="px-4 py-2 border rounded-lg w-64"
         />
+        <div className="text-sm text-gray-600">
+          Total words: {filteredWords.length}
+        </div>
         <button
-          onClick={vocabularyStore.exportVocabulary}
+          onClick={handleExport}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
         >
-          Export Vocabulary
+          Export
         </button>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th
-                onClick={() => handleSort('word')}
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-              >
-                Word {sortBy === 'word' && (sortOrder === 'asc' ? '↑' : '↓')}
-              </th>
-              <th
-                onClick={() => handleSort('stars')}
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-              >
-                Confidence {sortBy === 'stars' && (sortOrder === 'asc' ? '↑' : '↓')}
-              </th>
-              <th
-                onClick={() => handleSort('lastUpdated')}
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-              >
-                Last Updated {sortBy === 'lastUpdated' && (sortOrder === 'asc' ? '↑' : '↓')}
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Occurrences
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {paginatedWords.length === 0 ? (
-              <tr>
-                <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
-                  No vocabulary words found. Try searching for some words first.
-                </td>
-              </tr>
-            ) : (
-              paginatedWords.map(([word, data]) => (
-                <tr key={word} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">{word}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 4, 5].map(star => (
-                        <button
-                          key={star}
-                          onClick={() => vocabularyStore.setStars(word, star)}
-                          className={`w-6 h-6 ${
-                            star <= (data.stars || 0)
-                              ? 'text-yellow-400'
-                              : 'text-gray-300'
-                          }`}
-                        >
-                          ★
-                        </button>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {data.lastUpdated ? new Date(data.lastUpdated).toLocaleDateString() : '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {data.occurrences || 0}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <button
-                      onClick={() => onSearchWord(word)}
-                      className="text-blue-600 hover:text-blue-900"
-                    >
-                      Search
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+        <VocabularyTable 
+          words={paginatedWords}
+          onStarClick={handleStarClick}
+          onSearchWord={onSearchWord}
+        />
       </div>
 
       {totalPages > 1 && (
-        <div className="flex justify-between items-center mt-4">
-          <div className="text-sm text-gray-700">
-            Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, sortedWords.length)} of {sortedWords.length} entries
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className={`px-3 py-1 rounded ${
-                currentPage === 1
-                  ? 'bg-gray-100 text-gray-400'
-                  : 'bg-blue-500 text-white hover:bg-blue-600'
-              }`}
-            >
-              Previous
-            </button>
-            {[...Array(totalPages)].map((_, i) => (
-              <button
-                key={i + 1}
-                onClick={() => setCurrentPage(i + 1)}
-                className={`px-3 py-1 rounded ${
-                  currentPage === i + 1
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-100 hover:bg-gray-200'
-                }`}
-              >
-                {i + 1}
-              </button>
-            ))}
-            <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className={`px-3 py-1 rounded ${
-                currentPage === totalPages
-                  ? 'bg-gray-100 text-gray-400'
-                  : 'bg-blue-500 text-white hover:bg-blue-600'
-              }`}
-            >
-              Next
-            </button>
-          </div>
+        <div className="flex justify-center gap-2">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="px-3 py-1 rounded bg-blue-500 text-white disabled:bg-gray-300"
+          >
+            Previous
+          </button>
+          <span className="px-4 py-1">
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="px-3 py-1 rounded bg-blue-500 text-white disabled:bg-gray-300"
+          >
+            Next
+          </button>
         </div>
       )}
     </div>
   );
 };
 
-export default VocabularyView;
+export default React.memo(VocabularyView);
