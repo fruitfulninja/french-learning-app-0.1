@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import SearchView from './components/SearchView';
 import VocabularyView from './components/VocabularyView';
 import useVocabularyStore from './store/vocabularyStore';
-import { fixEncoding, normalizeText } from './utils/french';  // removed .jsx
+import { fixEncoding, normalizeText } from './utils/french';
 import { performSearch } from './utils/search';
 
 const TABS = {
@@ -19,6 +19,8 @@ const TABS = {
   }
 };
 
+const DEBOUNCE_DELAY = 300;
+
 const App = () => {
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
@@ -30,34 +32,31 @@ const App = () => {
   const [levelFilter, setLevelFilter] = useState(null);
   const [activeTab, setActiveTab] = useState('search');
 
-  const fuseOptions = {
+  // Memoize search options
+  const fuseOptions = useMemo(() => ({
     keys: ['content', 'choices', 'normalizedContent'],
     threshold: 0.2,
     distance: 100,
     minMatchCharLength: 3,
     includeScore: true,
     ignoreLocation: true,
-  };
+  }), []);
 
+  // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
+      console.log('Updating debounced search:', search);
       setDebouncedSearch(search);
-    }, 300);
+    }, DEBOUNCE_DELAY);
     return () => clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  useEffect(() => {
-    const filtered = performSearch(data, debouncedSearch, typeFilter, levelFilter, fuseOptions);
-    setFilteredData(filtered);
-  }, [debouncedSearch, typeFilter, levelFilter, data]);
-
-  const loadData = async () => {
+  // Load data
+  const loadData = useCallback(async () => {
     try {
+      console.log('Loading data...');
       setLoading(true);
+      
       const response = await fetch('/Question Bank.xlsx');
       if (!response.ok) throw new Error('Failed to fetch Excel file');
       
@@ -112,6 +111,7 @@ const App = () => {
         });
       });
 
+      console.log(`Loaded ${allData.length} items`);
       setData(allData);
       setFilteredData(allData);
       setLoading(false);
@@ -120,17 +120,30 @@ const App = () => {
       setError('Failed to load data: ' + err.message);
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Update filtered data when search or filters change
+  useEffect(() => {
+    console.log('Search parameters changed, updating filtered data');
+    const filtered = performSearch(data, debouncedSearch, typeFilter, levelFilter, fuseOptions);
+    setFilteredData(filtered);
+  }, [data, debouncedSearch, typeFilter, levelFilter, fuseOptions]);
 
   const { indexWords } = useVocabularyStore();
 
-  const handleSearch = (term) => {
+  const handleSearch = useCallback((term) => {
     setSearch(term);
     setActiveTab('search');
-  };
+  }, []);
 
+  // Index words for vocabulary
   useEffect(() => {
     if (data.length > 0) {
+      console.log('Indexing words from data');
       const allText = data.map(item => 
         `${item.content} ${item.choices || ''}`
       ).join(' ');
