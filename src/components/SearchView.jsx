@@ -1,8 +1,7 @@
-// components/SearchView.jsx
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import StatsTable from './StatsTable';
 import useVocabularyStore from '../store/vocabularyStore';
-import { getBaseForm } from '../utils/french';
+import { getBaseForm, getWordInfo } from '../utils/french';
 
 const SearchView = ({ 
   data,
@@ -17,16 +16,53 @@ const SearchView = ({
 }) => {
   console.log('SearchView render');
   const vocabularyStore = useVocabularyStore();
+  const [hoveredWord, setHoveredWord] = useState(null);
 
-  // Memoize handler to prevent recreation on every render
-  const handleStarWord = useCallback((word) => {
+  const handleStarWord = useCallback((word, event) => {
+    event.stopPropagation();
     console.log('Starring word:', word);
     const baseForm = getBaseForm(word);
     const currentStars = vocabularyStore.getVocabulary()[baseForm]?.stars || 0;
     vocabularyStore.setStars(baseForm, (currentStars % 5) + 1);
   }, [vocabularyStore]);
 
-  // Memoize text rendering function
+  const renderStars = useCallback((word) => {
+    const baseForm = getBaseForm(word);
+    const stars = vocabularyStore.getVocabulary()[baseForm]?.stars || 0;
+    return (
+      <div className="inline-flex ml-1 items-center">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            onClick={(e) => handleStarWord(word, e)}
+            className={`w-4 h-4 ${
+              star <= stars ? 'text-yellow-400' : 'text-gray-300'
+            } hover:text-yellow-500 transition-colors`}
+          >
+            ★
+          </button>
+        ))}
+      </div>
+    );
+  }, [vocabularyStore, handleStarWord]);
+
+  // Word info tooltip content
+  const getWordTooltip = useCallback((word) => {
+    const info = getWordInfo(word);
+    if (!info) return '';
+
+    const baseForm = getBaseForm(word);
+    const stars = vocabularyStore.getVocabulary()[baseForm]?.stars || 0;
+    
+    let tooltip = `Type: ${info.type}\n`;
+    if (info.gender) tooltip += `Gender: ${info.gender}\n`;
+    if (info.baseForm) tooltip += `Base form: ${info.baseForm}\n`;
+    if (info.isIrregular !== undefined) tooltip += `Irregular: ${info.isIrregular}\n`;
+    tooltip += `Confidence: ${stars}/5`;
+
+    return tooltip;
+  }, [vocabularyStore]);
+
   const renderHighlightedText = useCallback((text, searchTerm) => {
     if (!searchTerm || !text) return text;
     
@@ -34,19 +70,28 @@ const SearchView = ({
     
     return parts.map((part, i) => {
       if (part.toLowerCase() === searchTerm.toLowerCase()) {
+        const tooltip = getWordTooltip(part);
         return (
-          <mark 
-            key={i} 
-            className="bg-yellow-200 px-0.5 rounded cursor-pointer hover:bg-yellow-300"
-            onClick={() => handleStarWord(part)}
-          >
-            {part}
-          </mark>
+          <span key={i} className="relative inline-block group">
+            <mark 
+              className="bg-yellow-200 px-0.5 rounded cursor-pointer hover:bg-yellow-300"
+              onMouseEnter={() => setHoveredWord(part)}
+              onMouseLeave={() => setHoveredWord(null)}
+            >
+              {part}
+              {renderStars(part)}
+            </mark>
+            {hoveredWord === part && (
+              <div className="absolute bottom-full left-0 mb-2 px-2 py-1 bg-gray-800 text-white text-sm rounded shadow-lg whitespace-pre-wrap z-50">
+                {tooltip}
+              </div>
+            )}
+          </span>
         );
       }
       return part;
     });
-  }, [handleStarWord]);
+  }, [renderStars, getWordTooltip, hoveredWord]);
 
   // Memoize filtered data stats
   const stats = useMemo(() => ({
@@ -142,5 +187,4 @@ const SearchView = ({
   );
 };
 
-// Wrap with memo to prevent unnecessary rerenders
 export default React.memo(SearchView);
